@@ -19,8 +19,6 @@ class FolderBrowser extends Component
 {
     use WithFileUploads;
 
-    public const DISK = 'local';
-
     public ?Folder $folder = null;
 
     public string $newFolderName = '';
@@ -145,10 +143,12 @@ class FolderBrowser extends Component
     /** @return array{name: string, disk: string, path: string, mime_type: ?string, size: int} */
     private function storeFile(UploadedFile $file): array
     {
+        $disk = config('filesystems.documents_disk');
+
         return [
             'name' => $file->getClientOriginalName(),
-            'disk' => self::DISK,
-            'path' => $file->store('documentos/'.$this->folder->id, self::DISK),
+            'disk' => $disk,
+            'path' => $file->store('documentos/'.$this->folder->id, $disk),
             'mime_type' => $file->getMimeType(),
             'size' => $file->getSize(),
         ];
