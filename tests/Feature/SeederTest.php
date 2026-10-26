@@ -17,3 +17,11 @@ it('os dados de demonstração sobem sem erro', function () {
         ->assertOk()
         ->assertSee('Acompanhe a evolução do AgroMRO');
 });
+
+it('o seeder de demonstração não cria contas em produção', function () {
+    app()['env'] = 'production';
+
+    $this->artisan('db:seed', ['--force' => true])->assertSuccessful();
+
+    expect(User::count())->toBe(0);
+});

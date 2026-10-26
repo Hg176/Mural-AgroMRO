@@ -108,3 +108,18 @@ it('só abre no navegador o que dá para visualizar', function () {
     $this->actingAs($sander)->get(route('documents.preview', Document::firstWhere('name', 'semana-44.pdf')))->assertOk();
     $this->actingAs($sander)->get(route('documents.preview', Document::firstWhere('name', 'planilha.xlsx')))->assertNotFound();
 });
+
+it('salva no disco configurado para documentos (Supabase em produção)', function () {
+    Storage::fake('supabase');
+    config(['filesystems.documents_disk' => 'supabase']);
+
+    upload($this->hugo, $this->folder);
+
+    $document = Document::sole();
+    expect($document->disk)->toBe('supabase');
+    Storage::disk('supabase')->assertExists($document->path);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('documents.download', $document))
+        ->assertDownload('semana-44.pdf');
+});

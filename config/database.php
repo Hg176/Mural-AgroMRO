@@ -95,7 +95,9 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => 'public',
+            // No Supabase, use um schema só do mural (ex.: "mural") para não
+            // misturar com outros projetos nem expor as tabelas na API do Supabase.
+            'search_path' => env('DB_SEARCH_PATH', 'public'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 

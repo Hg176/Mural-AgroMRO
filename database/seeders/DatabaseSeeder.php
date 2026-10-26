@@ -24,6 +24,12 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
+        if (app()->isProduction()) {
+            $this->command->warn('Seeder de demonstração não roda em produção (cria contas com senha "password"). Use "php artisan mural:usuario".');
+
+            return;
+        }
+
         $this->today = Carbon::today();
 
         $this->hugo = User::create(['name' => 'Hugo Ferreira', 'email' => 'hugo@mural.test', 'password' => 'password', 'role' => Role::Admin]);
@@ -108,12 +114,13 @@ class DatabaseSeeder extends Seeder
     /** @return array{name: string, disk: string, path: string, mime_type: string, size: int} */
     private function store(Folder $folder, string $name, string $contents): array
     {
+        $disk = config('filesystems.documents_disk');
         $path = 'documentos/'.$folder->id.'/'.uniqid().'-'.$name;
-        Storage::disk('local')->put($path, $contents);
+        Storage::disk($disk)->put($path, $contents);
 
         return [
             'name' => $name,
-            'disk' => 'local',
+            'disk' => $disk,
             'path' => $path,
             'mime_type' => match (pathinfo($name, PATHINFO_EXTENSION)) {
                 'pdf' => 'application/pdf',

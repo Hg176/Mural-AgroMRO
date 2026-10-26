@@ -42,6 +42,72 @@ Testes: `vendor/bin/pest`.
 > Uploads: o limite do mural é 50 MB por arquivo. O PHP também precisa permitir isso
 > (`upload_max_filesize` e `post_max_size` no php.ini).
 
+## Colocando no ar (Supabase)
+
+O Supabase guarda o **banco** (Postgres) e os **arquivos** (Storage). O aplicativo
+Laravel em si roda numa hospedagem PHP ligada a este repositório (recomendado:
+[Laravel Cloud](https://cloud.laravel.com), que publica sozinho a cada merge na `main`).
+
+### 1. Banco no Supabase
+
+No **SQL Editor** do projeto, crie um schema só do mural:
+
+```sql
+create schema if not exists mural;
+```
+
+Assim as tabelas do mural não se misturam com as do seu outro projeto e não ficam
+expostas pela API REST do Supabase (que só publica os schemas configurados nela).
+
+Em **Connect > Session pooler**, copie host, porta, usuário e senha. Use o *session
+pooler* e não a conexão direta: a direta é só IPv6 e muitas hospedagens não alcançam.
+
+### 2. Arquivos no Supabase Storage
+
+1. Em **Storage**, crie um bucket **privado** chamado `mural`.
+2. Em **Storage > S3 Connection**, copie o endpoint e a região e gere um par de
+   *access keys*. Guarde a secret: ela só aparece uma vez.
+
+### 3. Variáveis de ambiente na hospedagem
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://endereco-do-mural
+APP_KEY=            # gere com: php artisan key:generate --show
+
+DB_CONNECTION=pgsql
+DB_HOST=aws-0-sa-east-1.pooler.supabase.com
+DB_PORT=5432
+DB_DATABASE=postgres
+DB_USERNAME=postgres.SEU_PROJECT_REF
+DB_PASSWORD=...
+DB_SSLMODE=require
+DB_SEARCH_PATH=mural
+
+DOCUMENTS_DISK=supabase
+SUPABASE_STORAGE_ENDPOINT=https://SEU_PROJECT_REF.storage.supabase.co/storage/v1/s3
+SUPABASE_STORAGE_REGION=sa-east-1
+SUPABASE_STORAGE_BUCKET=mural
+SUPABASE_STORAGE_KEY=...
+SUPABASE_STORAGE_SECRET=...
+```
+
+Como as sessões e o cache usam o banco (`SESSION_DRIVER=database`), não é preciso
+mais nada para o login funcionar entre deploys.
+
+### 4. Primeiro deploy
+
+Configure o comando de deploy para rodar `php artisan migrate --force`. Depois, pelo
+terminal/comandos da hospedagem, crie as contas:
+
+```bash
+php artisan mural:usuario   # uma vez para você, o Sander e o Zé
+```
+
+Mande para cada sócio o link e a senha. Eles não precisam de GitHub. Não rode o
+seeder em produção: ele se recusa, porque criaria contas com a senha `password`.
+
 ## Como o código está organizado
 
 ```
