@@ -1,59 +1,80 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Mural AgroMRO
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Portal de acompanhamento para os sócios do AgroMRO, no espírito do SharePoint Sites:
+o Hugo publica estudos e atualizações de desenvolvimento, e o Sander e o Zé acompanham,
+baixam os arquivos e conversam sobre cada tema.
 
-## About Laravel
+## O que tem hoje
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Gerenciador de arquivos**: pastas e subpastas, envio de vários arquivos de uma vez,
+  nova versão de um arquivo (v2, v3...), visualizar no navegador (PDF, imagem, texto) e baixar.
+- **Uma conversa por tema**: cada pasta tem a sua própria seção de comentários.
+- **Novidades (feed)**: linha do tempo com tudo o que muda (pasta criada, arquivo enviado,
+  nova versão, comentário). Itens que a pessoa ainda não viu aparecem como **novo**,
+  com um contador na aba Novidades.
+- **Acesso por login**, sem cadastro aberto.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Papel | Quem | Pode |
+| --- | --- | --- |
+| Administrador | Hugo | tudo: criar, editar e apagar pastas e arquivos, moderar comentários |
+| Sócio | Sander, Zé | ver tudo, baixar, comentar e apagar os próprios comentários |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Rodando localmente
 
-## Learning Laravel
+Precisa de PHP 8.2+ (recomendado: [Laravel Herd](https://herd.laravel.com)), Composer e Node.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+```bash
+composer install
+npm install && npm run build
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed   # cria os 3 sócios e dados de exemplo
+php artisan serve
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Acesse http://localhost:8000 e entre com `hugo@mural.test`, `sander@mural.test` ou
+`ze@mural.test`, todos com a senha `password` (só para testes locais).
 
-## Laravel Sponsors
+Para criar acessos de verdade: `php artisan mural:usuario`.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Testes: `vendor/bin/pest`.
 
-### Premium Partners
+> Uploads: o limite do mural é 50 MB por arquivo. O PHP também precisa permitir isso
+> (`upload_max_filesize` e `post_max_size` no php.ini).
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Como o código está organizado
 
-## Contributing
+```
+app/
+  Enums/Role.php             papéis (admin, sócio)
+  Enums/ActivityType.php     tipos de evento do feed, com a frase e o ícone de cada um
+  Models/                    Folder, Document, Comment, Activity, User
+  Observers/                 gravam o feed sozinhos quando algo é criado/alterado/apagado
+  Policies/                  quem pode fazer o quê (um lugar só para as regras)
+  Livewire/                  as telas: Home, Feed, FolderBrowser, Comments
+  Http/Controllers/          login e download/visualização de arquivos
+resources/views/             Blade + Tailwind
+tests/Feature/               testes em Pest
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Decisões que facilitam a evolução:
 
-## Code of Conduct
+- **Feed via observers.** Nenhuma tela precisa "lembrar" de registrar o que fez: criou,
+  trocou ou apagou um model observado, o evento aparece. Novo tipo de evento = um `case`
+  em `ActivityType` + uma linha no observer.
+- **O feed guarda um retrato do item** (`properties`), então o histórico continua legível
+  mesmo depois que um arquivo ou pasta é apagado.
+- **Comentários polimórficos** (`commentable`). Hoje só pastas têm conversa, mas dá para
+  comentar em um documento ou em um marco do projeto sem mexer na tabela.
+- **Arquivos em disco privado**, servidos só por rota autenticada e checada pela policy.
+  Trocar para S3/R2 depois é mudar o disco.
+- **Permissões nas policies.** Se um dia existir pasta restrita (ex.: só Hugo e Zé),
+  a regra entra em `FolderPolicy::view`.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Ideias para as próximas versões
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Resumo semanal por e-mail com as novidades.
+- Histórico de versões de cada arquivo (hoje a versão anterior é substituída).
+- Página "Roadmap / marcos" com status do desenvolvimento do AgroMRO.
+- Busca por nome de arquivo e por comentários.
+- Menções (@Sander) nos comentários.
