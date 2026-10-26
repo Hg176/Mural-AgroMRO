@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  @apply bg-stone-100 font-sans text-stone-800 antialiased;
+}

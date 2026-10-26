@@ -4,143 +4,124 @@ Portal de acompanhamento para os sócios do AgroMRO, no espírito do SharePoint 
 o Hugo publica estudos e atualizações de desenvolvimento, e o Sander e o Zé acompanham,
 baixam os arquivos e conversam sobre cada tema.
 
-## O que tem hoje
+Roda **sem servidor próprio**: o site é estático (GitHub Pages) e fala direto com o
+**Supabase**, que guarda o banco, o login e os arquivos.
 
-- **Gerenciador de arquivos**: pastas e subpastas, envio de vários arquivos de uma vez,
-  nova versão de um arquivo (v2, v3...), visualizar no navegador (PDF, imagem, texto) e baixar.
-- **Uma conversa por tema**: cada pasta tem a sua própria seção de comentários.
-- **Novidades (feed)**: linha do tempo com tudo o que muda (pasta criada, arquivo enviado,
-  nova versão, comentário). Itens que a pessoa ainda não viu aparecem como **novo**,
-  com um contador na aba Novidades.
-- **Acesso por login**, sem cadastro aberto.
+## O que tem
+
+- **Gerenciador de arquivos**: pastas e subpastas, envio de vários arquivos, nova versão
+  (v2, v3...), abrir no navegador (PDF, imagem, texto) e baixar.
+- **Uma conversa por tema**: cada pasta tem a sua seção de comentários.
+- **Novidades**: linha do tempo de tudo o que muda. O que a pessoa ainda não viu aparece
+  como **novo**, com contador na aba.
+- **Acesso por convite**: só entra quem o Hugo liberar.
 
 | Papel | Quem | Pode |
 | --- | --- | --- |
-| Administrador | Hugo | tudo: criar, editar e apagar pastas e arquivos, moderar comentários |
-| Sócio | Sander, Zé | ver tudo, baixar, comentar e apagar os próprios comentários |
+| admin | Hugo | criar, editar e apagar pastas e arquivos; moderar comentários |
+| socio | Sander, Zé | ver tudo, baixar, comentar e apagar os próprios comentários |
 
-## Rodando localmente
+## Como funciona (e onde está a segurança)
 
-Precisa de PHP 8.2+ (recomendado: [Laravel Herd](https://herd.laravel.com)), Composer e Node.
+```
+navegador (React, GitHub Pages)  ──supabase-js──▶  Supabase
+                                                    ├─ Auth: login por e-mail e senha
+                                                    ├─ Postgres, schema "mural": tabelas + RLS + triggers do feed
+                                                    └─ Storage, bucket privado "mural": os arquivos
+```
+
+Como o navegador fala direto com o banco, **as regras ficam no próprio banco**
+(`supabase/migrations/`), não no site:
+
+- **RLS** (Row Level Security): só quem tem linha em `mural.profiles` vê alguma coisa;
+  só `admin` cria/edita/apaga pastas e arquivos; cada um comenta em nome próprio.
+  Uma conta do Supabase sem perfil no mural (por exemplo, de outro projeto seu) não vê nada.
+- **Feed por triggers**: o banco registra sozinho cada pasta criada, arquivo enviado,
+  nova versão e comentário. O site não consegue escrever no feed.
+- **Arquivos privados**: o bucket só entrega arquivos por links temporários (1 minuto)
+  a quem é membro.
+
+Essas regras têm testes em `supabase/tests/` e rodam no CI a cada PR.
+
+## Colocar no ar
+
+### 1. Supabase (no projeto que você já tem)
+
+1. **SQL Editor**: cole e rode o conteúdo de
+   `supabase/migrations/20261026120000_mural.sql`. Ele cria o schema `mural`, as tabelas,
+   as regras e o bucket `mural`. Nada é criado fora do schema `mural` além do bucket.
+2. **Project Settings > Data API > Exposed schemas**: adicione `mural`.
+3. **Authentication > Users > Add user > Create new user**: crie a conta de cada pessoa
+   (e-mail e senha, marcando *Auto Confirm User*).
+4. **SQL Editor**: libere cada pessoa no mural:
+
+   ```sql
+   insert into mural.profiles (id, name, role)
+   select id, 'Hugo Ferreira', 'admin' from auth.users where email = 'seu@email.com';
+
+   insert into mural.profiles (id, name, role)
+   select id, 'Sander Gandolfi', 'socio' from auth.users where email = 'email-do-sander';
+
+   insert into mural.profiles (id, name, role)
+   select id, 'José Oliveira', 'socio' from auth.users where email = 'email-do-ze';
+   ```
+
+5. **Project Settings > API Keys**: copie a URL do projeto e a chave *publishable*
+   (ou a *anon*, nos projetos antigos). Essa chave pode ficar pública: quem protege os
+   dados é o RLS. **Nunca** use a chave *secret* / *service_role* no site.
+
+### 2. GitHub Pages
+
+1. **Settings > Pages > Source**: escolha *GitHub Actions*.
+2. **Settings > Secrets and variables > Actions > Variables**: crie
+   `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` com os valores do passo anterior.
+3. Rode o workflow **Publicar no GitHub Pages** (aba Actions) ou faça um merge na `main`.
+   O site fica em `https://hg176.github.io/Mural-AgroMRO/`.
+
+Mande o link e a senha para o Sander e o Zé. Eles não precisam de conta no GitHub.
+
+> Se o seu outro projeto permite cadastro aberto, alguém pode criar conta no seu
+> Supabase, mas vai cair na tela "Acesso ainda não liberado": sem linha em
+> `mural.profiles`, o RLS não entrega nada.
+
+## Desenvolvendo
+
+Precisa de Node 22 e Docker.
 
 ```bash
-composer install
-npm install && npm run build
-cp .env.example .env
-php artisan key:generate
-php artisan migrate --seed   # cria os 3 sócios e dados de exemplo
-php artisan serve
+npm install
+npx supabase start          # Supabase local, já com a migração aplicada
+node scripts/dados-demo.mjs # sócios e conteúdo de exemplo (senha "password")
+cp .env.example .env.local
+npm run dev                 # http://localhost:5173
 ```
 
-Acesse http://localhost:8000 e entre com `hugo@mural.test`, `sander@mural.test` ou
-`ze@mural.test`, todos com a senha `password` (só para testes locais).
+Testes das regras do banco: `npx supabase test db`. Lint e build: `npm run lint && npm run build`.
 
-Para criar acessos de verdade: `php artisan mural:usuario`.
+Mudou o banco? Crie um arquivo novo em `supabase/migrations/` (não edite o antigo depois
+que ele estiver em produção), rode `npx supabase db reset` e os testes, e no Supabase de
+produção rode o arquivo novo no SQL Editor.
 
-Testes: `vendor/bin/pest`.
-
-> Uploads: o limite do mural é 50 MB por arquivo. O PHP também precisa permitir isso
-> (`upload_max_filesize` e `post_max_size` no php.ini).
-
-## Colocando no ar (Supabase)
-
-O Supabase guarda o **banco** (Postgres) e os **arquivos** (Storage). O aplicativo
-Laravel em si roda numa hospedagem PHP ligada a este repositório (recomendado:
-[Laravel Cloud](https://cloud.laravel.com), que publica sozinho a cada merge na `main`).
-
-### 1. Banco no Supabase
-
-No **SQL Editor** do projeto, crie um schema só do mural:
-
-```sql
-create schema if not exists mural;
-```
-
-Assim as tabelas do mural não se misturam com as do seu outro projeto e não ficam
-expostas pela API REST do Supabase (que só publica os schemas configurados nela).
-
-Em **Connect > Session pooler**, copie host, porta, usuário e senha. Use o *session
-pooler* e não a conexão direta: a direta é só IPv6 e muitas hospedagens não alcançam.
-
-### 2. Arquivos no Supabase Storage
-
-1. Em **Storage**, crie um bucket **privado** chamado `mural`.
-2. Em **Storage > S3 Connection**, copie o endpoint e a região e gere um par de
-   *access keys*. Guarde a secret: ela só aparece uma vez.
-
-### 3. Variáveis de ambiente na hospedagem
-
-```env
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://endereco-do-mural
-APP_KEY=            # gere com: php artisan key:generate --show
-
-DB_CONNECTION=pgsql
-DB_HOST=aws-0-sa-east-1.pooler.supabase.com
-DB_PORT=5432
-DB_DATABASE=postgres
-DB_USERNAME=postgres.SEU_PROJECT_REF
-DB_PASSWORD=...
-DB_SSLMODE=require
-DB_SEARCH_PATH=mural
-
-DOCUMENTS_DISK=supabase
-SUPABASE_STORAGE_ENDPOINT=https://SEU_PROJECT_REF.storage.supabase.co/storage/v1/s3
-SUPABASE_STORAGE_REGION=sa-east-1
-SUPABASE_STORAGE_BUCKET=mural
-SUPABASE_STORAGE_KEY=...
-SUPABASE_STORAGE_SECRET=...
-```
-
-Como as sessões e o cache usam o banco (`SESSION_DRIVER=database`), não é preciso
-mais nada para o login funcionar entre deploys.
-
-### 4. Primeiro deploy
-
-Configure o comando de deploy para rodar `php artisan migrate --force`. Depois, pelo
-terminal/comandos da hospedagem, crie as contas:
-
-```bash
-php artisan mural:usuario   # uma vez para você, o Sander e o Zé
-```
-
-Mande para cada sócio o link e a senha. Eles não precisam de GitHub. Não rode o
-seeder em produção: ele se recusa, porque criaria contas com a senha `password`.
-
-## Como o código está organizado
+## Organização
 
 ```
-app/
-  Enums/Role.php             papéis (admin, sócio)
-  Enums/ActivityType.php     tipos de evento do feed, com a frase e o ícone de cada um
-  Models/                    Folder, Document, Comment, Activity, User
-  Observers/                 gravam o feed sozinhos quando algo é criado/alterado/apagado
-  Policies/                  quem pode fazer o quê (um lugar só para as regras)
-  Livewire/                  as telas: Home, Feed, FolderBrowser, Comments
-  Http/Controllers/          login e download/visualização de arquivos
-resources/views/             Blade + Tailwind
-tests/Feature/               testes em Pest
+supabase/migrations/   banco: tabelas, RLS, triggers do feed, bucket
+supabase/tests/        testes das regras de acesso (pgTAP)
+src/lib/api.ts         todas as consultas e ações (React Query + supabase-js)
+src/lib/auth.tsx       sessão e perfil de quem está logado
+src/components/        peças de tela (feed, comentários, lista de arquivos...)
+src/pages/             telas: Início, Novidades, Arquivos, Login
+scripts/dados-demo.mjs dados de exemplo para o Supabase local
 ```
 
-Decisões que facilitam a evolução:
-
-- **Feed via observers.** Nenhuma tela precisa "lembrar" de registrar o que fez: criou,
-  trocou ou apagou um model observado, o evento aparece. Novo tipo de evento = um `case`
-  em `ActivityType` + uma linha no observer.
-- **O feed guarda um retrato do item** (`properties`), então o histórico continua legível
-  mesmo depois que um arquivo ou pasta é apagado.
-- **Comentários polimórficos** (`commentable`). Hoje só pastas têm conversa, mas dá para
-  comentar em um documento ou em um marco do projeto sem mexer na tabela.
-- **Arquivos em disco privado**, servidos só por rota autenticada e checada pela policy.
-  Trocar para S3/R2 depois é mudar o disco.
-- **Permissões nas policies.** Se um dia existir pasta restrita (ex.: só Hugo e Zé),
-  a regra entra em `FolderPolicy::view`.
+Para um novo tipo de evento no feed: adicione o tipo no `check` de `mural.activities`
+(numa migração nova), grave-o num trigger e dê uma frase e um ícone a ele em
+`src/components/ActivityItem.tsx`.
 
 ## Ideias para as próximas versões
 
-- Resumo semanal por e-mail com as novidades.
+- Feed ao vivo com Supabase Realtime.
+- Resumo semanal por e-mail.
 - Histórico de versões de cada arquivo (hoje a versão anterior é substituída).
-- Página "Roadmap / marcos" com status do desenvolvimento do AgroMRO.
-- Busca por nome de arquivo e por comentários.
-- Menções (@Sander) nos comentários.
+- Página de roadmap/marcos do AgroMRO.
+- Busca e menções (@Sander) nos comentários.
