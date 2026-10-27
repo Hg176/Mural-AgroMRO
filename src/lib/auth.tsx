@@ -18,14 +18,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  // De qual usuário é o perfil carregado. Logo após entrar a sessão chega antes do
+  // perfil; sem isso a tela de "e-mail não liberado" pisca antes do mural abrir.
+  const [profileUserId, setProfileUserId] = useState<string | null>(null)
 
   async function loadProfile(userId: string | undefined) {
     if (!userId) {
       setProfile(null)
+      setProfileUserId(null)
       return
     }
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     setProfile(data)
+    setProfileUserId(userId)
   }
 
   useEffect(() => {
@@ -45,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value: AuthState = {
-    loading,
+    loading: loading || (session !== null && profileUserId !== session.user.id),
     session,
     profile,
     isAdmin: profile?.role === 'admin',
