@@ -10,4 +10,7 @@ if (!url || !key) {
 // Todas as tabelas do mural ficam no schema "mural", separado de outros projetos.
 export const supabase = createClient(url, key, { db: { schema: 'mural' } })
 
+/** Endereço do mural, para onde o link do e-mail leva de volta. */
+export const SITE_URL = `${window.location.origin}${window.location.pathname}`
+
 export const BUCKET = 'mural'

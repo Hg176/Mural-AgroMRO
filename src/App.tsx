@@ -7,17 +7,15 @@ import { FoldersPage } from './pages/FoldersPage'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { NoAccess } from './pages/NoAccess'
-import { TwoFactor } from './pages/TwoFactor'
 import { TrashPage } from './pages/TrashPage'
 
 // HashRouter (#/arquivos/1) porque o GitHub Pages não sabe redirecionar rotas de SPA.
 export default function App() {
-  const { loading, session, profile, mfa, isAdmin } = useAuth()
+  const { loading, session, profile, isAdmin } = useAuth()
 
   if (loading) return <AppSkeleton />
   if (!session) return <Login />
   if (!profile) return <NoAccess />
-  if (mfa !== 'ok') return <TwoFactor step={mfa} />
 
   return (
     <HashRouter>

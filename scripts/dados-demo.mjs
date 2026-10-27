@@ -4,7 +4,7 @@
 //   npx supabase start && node scripts/dados-demo.mjs
 //
 // Usa a chave secreta (service role) do Supabase local. Não rode em produção:
-// cria contas com a senha "password".
+// cria contas de teste (senha "password", caso queira usar pela API).
 import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
@@ -99,4 +99,4 @@ await backdate(0, '09:30', 'documents', semana44.id)
 
 await comment(desenvolvimento, sander, 'A exportação para Excel vai ajudar muito na conversa com os clientes. Dá para incluir o código do fornecedor?', 0, '10:15')
 
-console.log('Pronto: entre com hugo@mural.test, sander@mural.test ou ze@mural.test (senha "password").')
+console.log('Pronto: peça o link com hugo@mural.test, sander@mural.test ou ze@mural.test e abra o e-mail em http://127.0.0.1:54324.')
