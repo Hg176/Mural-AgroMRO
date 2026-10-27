@@ -41,6 +41,10 @@ Como o navegador fala direto com o banco, **as regras ficam no próprio banco**
 - **Arquivos privados**: o bucket só entrega arquivos por links temporários (1 minuto)
   a quem é membro.
 
+- **CSP no site publicado**: a página só roda o próprio código e só conversa com o
+  Supabase configurado (`vite.config.ts`). Comentários e nomes de arquivo são sempre
+  mostrados como texto, nunca como HTML.
+
 Essas regras têm testes em `supabase/tests/` e rodam no CI a cada PR.
 
 ## Colocar no ar
@@ -83,6 +87,20 @@ Mande o link e a senha para o Sander e o Zé. Eles não precisam de conta no Git
 > Se o seu outro projeto permite cadastro aberto, alguém pode criar conta no seu
 > Supabase, mas vai cair na tela "Acesso ainda não liberado": sem linha em
 > `mural.profiles`, o RLS não entrega nada.
+
+### 3. Ajustes de segurança no Supabase
+
+Feitos no painel, uma vez:
+
+- **Authentication > Sign In / Providers**: desligue *Allow new users to sign up*
+  (se o outro projeto que divide este Supabase não precisar de cadastro aberto).
+  Os sócios são criados à mão no passo 1.3.
+- **Authentication > Password** (ou *Providers > Email*): senha mínima de 10 caracteres,
+  com letras e números.
+- **Chave secreta** (*secret* / *service_role*): fica só no painel e em servidores seus,
+  nunca no site nem no repositório. Quem a tem ignora o RLS e lê tudo.
+- O ideal é o mural ter um **projeto Supabase só dele**: assim, um problema no outro
+  sistema (ou a chave secreta dele) não alcança os arquivos dos sócios.
 
 ## Desenvolvendo
 
