@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Comments } from '../components/Comments'
 import { DocumentList } from '../components/DocumentList'
+import { FileDropZone, UploadList, useFolderUploads } from '../components/FileUploads'
 import { FolderCard } from '../components/FolderCard'
 import { Icon } from '../components/Icon'
 import { NewFolderButton } from '../components/NewFolderDialog'
 import { FolderGridSkeleton, FolderPageSkeleton } from '../components/Skeleton'
-import { useDeleteFolder, useFolderPath, useFolders, useUpdateFolder, useUploadDocuments } from '../lib/api'
+import { useDeleteFolder, useFolderPath, useFolders, useUpdateFolder } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import type { Folder } from '../lib/types'
 
@@ -29,14 +30,14 @@ function FolderView({ folder, path }: { folder: Folder | null; path: Folder[] })
   const { isAdmin } = useAuth()
   const [search] = useSearchParams()
   const { data: children = [], isLoading: loadingChildren } = useFolders(folder?.id ?? null)
-  const upload = useUploadDocuments()
+  const uploads = useFolderUploads(folder?.id ?? 0)
   const highlight = search.get('documento') ? Number(search.get('documento')) : null
 
   useEffect(() => {
     if (search.has('comentarios')) document.getElementById('comentarios')?.scrollIntoView()
   }, [search])
 
-  return (
+  const page = (
     <div>
       <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-stone-500">
         <Link to="/arquivos" className="hover:text-emerald-800">Arquivos</Link>
@@ -66,12 +67,13 @@ function FolderView({ folder, path }: { folder: Folder | null; path: Folder[] })
           <div className="flex flex-wrap gap-2">
             <NewFolderButton parent={folder} />
             {folder && (
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-800">
+              // O botão continua para o celular e para quem usa teclado; no computador dá para só arrastar.
+              <label title="Ou arraste os arquivos para esta tela" className="flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white shadow-sm focus-within:ring-4 focus-within:ring-emerald-600/25 hover:bg-emerald-800">
                 <Icon name="upload" className="size-4" />
-                {upload.isPending ? 'Enviando...' : 'Enviar arquivos'}
-                <input type="file" multiple className="hidden" disabled={upload.isPending} onChange={(event) => {
+                {uploads.sending ? 'Enviando...' : 'Enviar arquivos'}
+                <input type="file" multiple className="sr-only" onChange={(event) => {
                   const files = [...(event.target.files ?? [])]
-                  if (files.length) upload.mutate({ folderId: folder.id, files })
+                  if (files.length) uploads.add(files)
                   event.target.value = ''
                 }} />
               </label>
@@ -81,10 +83,10 @@ function FolderView({ folder, path }: { folder: Folder | null; path: Folder[] })
         )}
       </div>
 
-      {upload.error && <p className="mb-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-700">Falha no envio: {upload.error.message}</p>}
+      {folder && isAdmin && <UploadList uploads={uploads.uploads} onDismiss={uploads.dismiss} />}
 
       <div className={`grid gap-8 ${folder ? 'lg:grid-cols-5' : ''}`}>
-        <div className={`space-y-6 ${folder ? 'lg:col-span-3' : ''}`}>
+        <div className={`min-w-0 space-y-6 ${folder ? 'lg:col-span-3' : ''}`}>
           {/* Na raiz as pastas são o conteúdo todo; dentro de uma pasta, as subpastas são raras e não ganham esqueleto. */}
           {!folder && loadingChildren && <FolderGridSkeleton count={6} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
           {children.length > 0 && (
@@ -95,18 +97,21 @@ function FolderView({ folder, path }: { folder: Folder | null; path: Folder[] })
           {!folder && !loadingChildren && children.length === 0 && (
             <p className="rounded-xl bg-white p-10 text-center text-sm text-stone-500 ring-1 ring-stone-200">Nenhuma pasta criada ainda.</p>
           )}
-          {folder && <DocumentList folderId={folder.id} highlight={highlight} />}
+          {folder && <DocumentList folderId={folder.id} highlight={highlight} canDrop={isAdmin} />}
         </div>
 
         {/* Uma seção de comentários por tema */}
         {folder && (
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             <Comments folder={folder} />
           </div>
         )}
       </div>
     </div>
   )
+
+  if (!folder || !isAdmin) return page
+  return <FileDropZone folderName={folder.name} onFiles={uploads.add}>{page}</FileDropZone>
 }
 
 function FolderHeader({ folder }: { folder: Folder }) {

@@ -15,7 +15,7 @@ async function open(document: Document, download: boolean) {
   else window.open(url, '_blank', 'noopener')
 }
 
-export function DocumentList({ folderId, highlight }: { folderId: number; highlight: number | null }) {
+export function DocumentList({ folderId, highlight, canDrop = false }: { folderId: number; highlight: number | null; canDrop?: boolean }) {
   const { isAdmin } = useAuth()
   const { data: documents = [], isLoading } = useDocuments(folderId)
   const replace = useReplaceDocument()
@@ -33,7 +33,17 @@ export function DocumentList({ folderId, highlight }: { folderId: number; highli
       {isLoading && <DocumentRowsSkeleton />}
       {(replace.error || remove.error) && <p className="bg-rose-50 px-5 py-2 text-sm text-rose-700">{(replace.error ?? remove.error)?.message}</p>}
       <ul className="divide-y divide-stone-100">
-        {!isLoading && documents.length === 0 && <li className="px-5 py-10 text-center text-sm text-stone-500">Nenhum arquivo nesta pasta ainda.</li>}
+        {!isLoading && documents.length === 0 && (
+          <li className="px-5 py-10 text-center text-sm text-stone-500">
+            Nenhum arquivo nesta pasta ainda.
+            {canDrop && (
+              <span className="mt-3 flex flex-col items-center gap-2 text-stone-400">
+                <Icon name="upload" className="size-6" />
+                Arraste arquivos para cá para enviar.
+              </span>
+            )}
+          </li>
+        )}
         {documents.map((doc) => (
           <li key={doc.id} id={`documento-${doc.id}`} className={`flex items-center gap-4 px-5 py-3 ${highlight === doc.id ? 'bg-amber-50' : ''}`}>
             <span className="flex h-10 w-12 shrink-0 items-center justify-center rounded-md bg-sky-50 text-[11px] font-bold text-sky-700 ring-1 ring-sky-200">{extension(doc.name)}</span>
