@@ -5,6 +5,7 @@ import { extension, fileSize, isPreviewable, plural } from '../lib/format'
 import type { Document } from '../lib/types'
 import { Icon } from './Icon'
 import { RelativeTime } from './RelativeTime'
+import { DocumentRowsSkeleton, Skeleton } from './Skeleton'
 
 const ICON_BUTTON = 'rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-emerald-800'
 
@@ -26,7 +27,10 @@ export function DocumentList({ folderId, highlight }: { folderId: number; highli
 
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-stone-200">
-      <div className="border-b border-stone-100 px-5 py-3 text-sm font-semibold text-stone-700">{plural(documents.length, 'arquivo')}</div>
+      <div className="border-b border-stone-100 px-5 py-3 text-sm font-semibold text-stone-700">
+        {isLoading ? <Skeleton className="my-0.5 h-4 w-20" /> : plural(documents.length, 'arquivo')}
+      </div>
+      {isLoading && <DocumentRowsSkeleton />}
       {(replace.error || remove.error) && <p className="bg-rose-50 px-5 py-2 text-sm text-rose-700">{(replace.error ?? remove.error)?.message}</p>}
       <ul className="divide-y divide-stone-100">
         {!isLoading && documents.length === 0 && <li className="px-5 py-10 text-center text-sm text-stone-500">Nenhum arquivo nesta pasta ainda.</li>}

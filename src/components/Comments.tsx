@@ -5,11 +5,12 @@ import type { Folder } from '../lib/types'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
 import { RelativeTime } from './RelativeTime'
+import { CommentsSkeleton } from './Skeleton'
 
 /** A seção de conversa de um tema (uma por pasta). */
 export function Comments({ folder }: { folder: Folder }) {
   const { profile, isAdmin } = useAuth()
-  const { data: comments = [] } = useComments(folder.id)
+  const { data: comments = [], isLoading } = useComments(folder.id)
   const post = usePostComment()
   const remove = useDeleteComment()
   const [body, setBody] = useState('')
@@ -31,7 +32,8 @@ export function Comments({ folder }: { folder: Folder }) {
       </header>
 
       <ul className="max-h-[32rem] space-y-4 overflow-y-auto px-5 py-4">
-        {comments.length === 0 && <li className="py-6 text-center text-sm text-stone-500">Ninguém comentou ainda. Comece a conversa.</li>}
+        {isLoading && <li><CommentsSkeleton /></li>}
+        {!isLoading && comments.length === 0 && <li className="py-6 text-center text-sm text-stone-500">Ninguém comentou ainda. Comece a conversa.</li>}
         {comments.map((comment) => (
           <li key={comment.id} className="flex gap-3">
             <Avatar user={comment.author} className="size-8" />

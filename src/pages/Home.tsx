@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Feed } from '../components/Feed'
 import { FolderCard } from '../components/FolderCard'
 import { RelativeTime } from '../components/RelativeTime'
+import { DocumentRowsSkeleton, FolderGridSkeleton, Skeleton } from '../components/Skeleton'
 import { useFolders, useLatestDocuments, useStats } from '../lib/api'
 import { useProfile } from '../lib/auth'
 import { extension } from '../lib/format'
@@ -11,9 +12,9 @@ export function Home() {
   const profile = useProfile()
   // A página inicial mostra o que é novo, mas não zera o contador: isso só acontece em Novidades.
   const [seenAt] = useState(profile.feed_seen_at)
-  const { data: folders = [] } = useFolders(null)
+  const { data: folders = [], isLoading: loadingFolders } = useFolders(null)
   const { data: stats } = useStats()
-  const { data: latest = [] } = useLatestDocuments()
+  const { data: latest = [], isLoading: loadingLatest } = useLatestDocuments()
 
   return (
     <div className="space-y-8">
@@ -25,10 +26,12 @@ export function Home() {
           <Link to="/novidades" className="font-medium text-emerald-800 hover:underline">Novidades</Link>.
         </p>
         <dl className="mt-5 grid grid-cols-3 gap-3 sm:max-w-md">
-          {Object.entries(stats ?? { Pastas: '–', Arquivos: '–', Comentários: '–' }).map(([label, value]) => (
+          {Object.entries(stats ?? { Pastas: null, Arquivos: null, Comentários: null }).map(([label, value]) => (
             <div key={label} className="rounded-lg bg-stone-50 px-4 py-3 ring-1 ring-stone-200">
               <dt className="text-xs text-stone-500">{label}</dt>
-              <dd className="text-xl font-semibold text-stone-900">{value}</dd>
+              <dd className="text-xl font-semibold text-stone-900" aria-busy={value === null}>
+                {value ?? <Skeleton className="my-1 h-5 w-8" />}
+              </dd>
             </div>
           ))}
         </dl>
@@ -50,10 +53,18 @@ export function Home() {
               <Link to="/arquivos" className="text-sm font-medium text-emerald-800 hover:underline">Abrir arquivos</Link>
             </div>
             <div className="grid gap-3">
+              {loadingFolders && <FolderGridSkeleton />}
               {folders.map((folder) => <FolderCard key={folder.id} folder={folder} />)}
-              {folders.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-sm text-stone-500 ring-1 ring-stone-200">Nenhuma pasta criada ainda.</p>}
+              {!loadingFolders && folders.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-sm text-stone-500 ring-1 ring-stone-200">Nenhuma pasta criada ainda.</p>}
             </div>
           </section>
+
+          {loadingLatest && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold text-stone-900">Documentos recentes</h2>
+              <div className="rounded-xl bg-white shadow-sm ring-1 ring-stone-200"><DocumentRowsSkeleton compact /></div>
+            </section>
+          )}
 
           {latest.length > 0 && (
             <section>

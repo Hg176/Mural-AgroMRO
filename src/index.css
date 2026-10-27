@@ -7,3 +7,18 @@
 body {
   @apply bg-stone-100 font-sans text-stone-800 antialiased;
 }
+
+/* Esqueletos aparecem só se a carga passar de ~150 ms, para não piscar. */
+@keyframes skeleton-in {
+  from { opacity: 0; }
+}
+
+.skeleton-in {
+  animation: skeleton-in 200ms ease-out 150ms backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-in {
+    animation: none;
+  }
+}
