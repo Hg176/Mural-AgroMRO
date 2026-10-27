@@ -95,6 +95,8 @@ export function useFeed(filter: FeedFilter, limit: number) {
       if (filter !== 'tudo') query = query.in('type', FEED_TYPES[filter])
       return unwrap<Activity[]>(await query)
     },
+    // "Ver mais antigos" mantém a lista na tela; trocar o filtro mostra o esqueleto.
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] === filter ? previous : undefined),
   })
 }
 

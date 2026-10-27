@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { AppSkeleton } from './components/Skeleton'
 import { useAuth } from './lib/auth'
 import { FeedPage } from './pages/FeedPage'
 import { FoldersPage } from './pages/FoldersPage'
@@ -11,7 +12,7 @@ import { NoAccess } from './pages/NoAccess'
 export default function App() {
   const { loading, session, profile } = useAuth()
 
-  if (loading) return null
+  if (loading) return <AppSkeleton />
   if (!session) return <Login />
   if (!profile) return <NoAccess />
 

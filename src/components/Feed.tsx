@@ -4,6 +4,7 @@ import { useProfile } from '../lib/auth'
 import { dayLabel } from '../lib/format'
 import type { Activity } from '../lib/types'
 import { ActivityItem } from './ActivityItem'
+import { ActivitySkeleton } from './Skeleton'
 
 const FILTERS: [FeedFilter, string][] = [
   ['tudo', 'Tudo'],
@@ -47,7 +48,7 @@ export function Feed({ compact = false, seenAt }: { compact?: boolean; seenAt: s
       )}
 
       <div className={`rounded-xl bg-white shadow-sm ring-1 ring-stone-200 ${compact ? 'px-5 py-2' : 'p-5'}`}>
-        {isLoading && <p className="py-10 text-center text-sm text-stone-500">Carregando...</p>}
+        {isLoading && <ActivitySkeleton rows={compact ? 4 : 6} />}
         {!isLoading && activities.length === 0 && <p className="py-10 text-center text-sm text-stone-500">Nada por aqui ainda.</p>}
 
         {[...days].map(([day, items]) => (

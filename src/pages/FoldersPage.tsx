@@ -5,6 +5,7 @@ import { DocumentList } from '../components/DocumentList'
 import { FolderCard } from '../components/FolderCard'
 import { Icon } from '../components/Icon'
 import { NewFolderButton } from '../components/NewFolderDialog'
+import { FolderGridSkeleton, FolderPageSkeleton } from '../components/Skeleton'
 import { useDeleteFolder, useFolderPath, useFolders, useUpdateFolder, useUploadDocuments } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import type { Folder } from '../lib/types'
@@ -19,7 +20,7 @@ export function FoldersPage() {
   if (folderId && !isLoading && !folder) {
     return <p className="rounded-xl bg-white p-10 text-center text-stone-500 ring-1 ring-stone-200">Pasta não encontrada. Ela pode ter sido apagada.</p>
   }
-  if (folderId && !folder) return null
+  if (folderId && !folder) return <FolderPageSkeleton />
 
   return <FolderView key={folderId ?? 'raiz'} folder={folder} path={folderId ? path : []} />
 }
@@ -27,7 +28,7 @@ export function FoldersPage() {
 function FolderView({ folder, path }: { folder: Folder | null; path: Folder[] }) {
   const { isAdmin } = useAuth()
   const [search] = useSearchParams()
-  const { data: children = [] } = useFolders(folder?.id ?? null)
+  const { data: children = [], isLoading: loadingChildren } = useFolders(folder?.id ?? null)
   const upload = useUploadDocuments()
   const highlight = search.get('documento') ? Number(search.get('documento')) : null
 
@@ -84,12 +85,14 @@ function FolderView({ folder, path }: { folder: Folder | null; path: Folder[] })
 
       <div className={`grid gap-8 ${folder ? 'lg:grid-cols-5' : ''}`}>
         <div className={`space-y-6 ${folder ? 'lg:col-span-3' : ''}`}>
+          {/* Na raiz as pastas são o conteúdo todo; dentro de uma pasta, as subpastas são raras e não ganham esqueleto. */}
+          {!folder && loadingChildren && <FolderGridSkeleton count={6} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
           {children.length > 0 && (
             <div className={`grid gap-3 ${folder ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
               {children.map((child) => <FolderCard key={child.id} folder={child} />)}
             </div>
           )}
-          {!folder && children.length === 0 && (
+          {!folder && !loadingChildren && children.length === 0 && (
             <p className="rounded-xl bg-white p-10 text-center text-sm text-stone-500 ring-1 ring-stone-200">Nenhuma pasta criada ainda.</p>
           )}
           {folder && <DocumentList folderId={folder.id} highlight={highlight} />}
