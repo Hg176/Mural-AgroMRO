@@ -244,6 +244,11 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Mesmo texto que vai no painel (Authentication > Emails > Magic Link), com o código.
+[auth.email.template.magic_link]
+subject = "Seu acesso ao Mural AgroMRO"
+content_path = "./supabase/templates/magic_link.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

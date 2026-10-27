@@ -33,8 +33,9 @@ navegador (React, GitHub Pages)  ──supabase-js──▶  Supabase
 Como o navegador fala direto com o banco, **as regras ficam no próprio banco**
 (`supabase/migrations/`), não no site:
 
-- **Login por link no e-mail**: sem senha. A pessoa digita o e-mail e clica no link que
-  chega; só contas criadas à mão recebem link (o site não cria contas). A mensagem é a
+- **Login por código no e-mail**: sem senha. A pessoa digita o e-mail, recebe um código e
+  digita no aparelho onde pediu (ou clica no link, se abriu o e-mail no mesmo aparelho);
+  só contas criadas à mão recebem (o site não cria contas). A mensagem é a
   mesma para e-mail com ou sem acesso, para não revelar quem está no mural.
 - **RLS** (Row Level Security): só quem tem linha em `mural.profiles` vê alguma coisa;
   só `admin` cria/edita/apaga pastas e arquivos; cada um comenta em nome próprio.
@@ -105,8 +106,10 @@ Mande o link para o Sander e o Zé. Eles entram com o próprio e-mail e não pre
   da equipe do projeto no painel e no máximo 2 por hora. Para o Sander e o Zé receberem
   o link, configure um SMTP próprio (por exemplo, Resend no plano grátis ou uma senha de
   app do Gmail). Se o outro projeto já tem SMTP configurado, não precisa fazer nada.
-- Opcional: **Authentication > Emails > Magic Link** para trocar o texto do e-mail. Esse
-  modelo vale para o projeto inteiro, inclusive o outro sistema.
+- **Authentication > Emails > Magic Link**: troque o assunto para `Seu acesso ao Mural AgroMRO`
+  e o corpo pelo conteúdo de `supabase/templates/magic_link.html`. Ele traz o **código**
+  (`{{ .Token }}`) que a pessoa digita no computador quando abre o e-mail no celular, além
+  do link. Esse modelo vale para o projeto inteiro, inclusive o outro sistema.
 
 ### 4. Ajustes de segurança no Supabase
 
