@@ -8,8 +8,20 @@ interface AuthState {
   session: Session | null
   /** Nulo para quem tem conta no Supabase mas não foi liberado no mural. */
   profile: Profile | null
+  /**
+   * Login em 2 etapas: "cadastrar" = ainda não ligou o app autenticador;
+   * "confirmar" = falta digitar o código desta vez; "ok" = pode entrar.
+   */
+  mfa: 'cadastrar' | 'confirmar' | 'ok'
   isAdmin: boolean
   refreshProfile: () => Promise<void>
+  refreshMfa: () => Promise<void>
+}
+
+async function mfaStep(): Promise<AuthState['mfa']> {
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (data?.currentLevel === 'aal2') return 'ok'
+  return data?.nextLevel === 'aal2' ? 'confirmar' : 'cadastrar'
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -17,6 +29,7 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [mfa, setMfa] = useState<AuthState['mfa']>('cadastrar')
   const [loading, setLoading] = useState(true)
 
   async function loadProfile(userId: string | undefined) {
@@ -31,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session)
+      if (data.session) setMfa(await mfaStep())
       await loadProfile(data.session?.user.id)
       setLoading(false)
     })
@@ -38,7 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession)
       // Fora do callback para não travar o cliente do Supabase (recomendação da lib).
-      setTimeout(() => loadProfile(newSession?.user.id), 0)
+      setTimeout(async () => {
+        if (newSession) setMfa(await mfaStep())
+        await loadProfile(newSession?.user.id)
+      }, 0)
     })
 
     return () => data.subscription.unsubscribe()
@@ -48,8 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     session,
     profile,
+    mfa,
     isAdmin: profile?.role === 'admin',
     refreshProfile: () => loadProfile(session?.user.id),
+    refreshMfa: async () => setMfa(await mfaStep()),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

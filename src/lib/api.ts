@@ -2,7 +2,7 @@
 // quem pode o quê ficam no banco (RLS), então aqui não há checagem de papel.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BUCKET, supabase } from './supabase'
-import type { Activity, Comment, Document, Folder, FolderSummary } from './types'
+import type { Activity, Comment, Document, Folder, FolderSummary, TrashItem } from './types'
 
 const FOLDER_SUMMARY = '*, documents(count), comments(count), children:folders!parent_id(count)'
 
@@ -179,12 +179,10 @@ export function useUpdateFolder() {
   })
 }
 
+/** Vai para a lixeira, com subpastas, arquivos e comentários. */
 export function useDeleteFolder() {
   return useMuralMutation(async (id: number) => {
-    // O banco apaga subpastas e documentos em cascata; os arquivos do bucket, não.
-    const paths = unwrap<string[]>(await supabase.rpc('folder_document_paths', { p_folder_id: id }))
-    unwrap(await supabase.from('folders').delete().eq('id', id))
-    if (paths.length) await supabase.storage.from(BUCKET).remove(paths)
+    unwrap(await supabase.rpc('trash_folder', { p_id: id }))
   })
 }
 
@@ -221,9 +219,37 @@ export function useReplaceDocument() {
 
 export function useDeleteDocument() {
   return useMuralMutation(async (document: Document) => {
-    unwrap(await supabase.from('documents').delete().eq('id', document.id))
-    await supabase.storage.from(BUCKET).remove([document.path])
+    unwrap(await supabase.rpc('trash_document', { p_id: document.id }))
   })
+}
+
+// Lixeira ---------------------------------------------------------------------
+
+export const TRASH_DAYS = 30
+
+export function useTrash() {
+  return useQuery({ queryKey: ['trash'], queryFn: async () => unwrap<TrashItem[]>(await supabase.rpc('trash_items')) })
+}
+
+export function useRestore() {
+  return useMuralMutation(async (item: TrashItem) => {
+    unwrap(await supabase.rpc(item.kind === 'folder' ? 'restore_folder' : 'restore_document', { p_id: item.id }))
+  })
+}
+
+/** O banco apaga as linhas e devolve os caminhos; os arquivos do bucket saem por aqui. */
+async function purge(args: { p_kind?: TrashItem['kind']; p_id?: number }) {
+  const paths = unwrap<string[]>(await supabase.rpc('purge_trash', args))
+  if (paths.length) await supabase.storage.from(BUCKET).remove(paths)
+}
+
+export function usePurge() {
+  return useMuralMutation((item: TrashItem) => purge({ p_kind: item.kind, p_id: item.id }))
+}
+
+/** Apaga de vez o que está na lixeira há mais de 30 dias. Roda quando um admin abre o mural. */
+export function purgeExpiredTrash() {
+  return purge({}).catch(() => undefined)
 }
 
 export function usePostComment() {

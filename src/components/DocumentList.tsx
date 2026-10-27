@@ -61,7 +61,7 @@ export function DocumentList({ folderId, highlight }: { folderId: number; highli
                       event.target.value = ''
                     }} />
                   </label>
-                  <button onClick={() => confirm(`Apagar ${doc.name}?`) && remove.mutate(doc)} className="rounded-md p-2 text-stone-500 hover:bg-rose-50 hover:text-rose-600" title="Apagar">
+                  <button onClick={() => confirm(`Mover ${doc.name} para a lixeira? Dá para restaurar por 30 dias.`) && remove.mutate(doc)} className="rounded-md p-2 text-stone-500 hover:bg-rose-50 hover:text-rose-600" title="Mover para a lixeira">
                     <Icon name="trash" className="size-4" />
                   </button>
                 </>

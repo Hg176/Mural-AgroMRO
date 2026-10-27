@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useUnreadCount } from '../lib/api'
-import { useProfile } from '../lib/auth'
+import { useEffect } from 'react'
+import { purgeExpiredTrash, useUnreadCount } from '../lib/api'
+import { useAuth, useProfile } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { Avatar } from './Avatar'
 import { Icon, type IconName } from './Icon'
@@ -14,7 +15,14 @@ const TABS: [string, string, IconName][] = [
 // Barra do "site", no espírito do SharePoint: identidade + navegação por abas.
 export function Layout() {
   const profile = useProfile()
+  const { isAdmin } = useAuth()
   const { data: unread = 0 } = useUnreadCount(profile.id, profile.feed_seen_at)
+  const tabs = isAdmin ? [...TABS, ['/lixeira', 'Lixeira', 'trash'] as (typeof TABS)[number]] : TABS
+
+  // O banco não tem agendador garantido no plano grátis: quem abre o mural faz a faxina.
+  useEffect(() => {
+    if (isAdmin) purgeExpiredTrash()
+  }, [isAdmin])
 
   return (
     <div className="min-h-screen">
@@ -43,7 +51,7 @@ export function Layout() {
         </div>
 
         <nav className="mx-auto mt-4 flex max-w-6xl gap-1 overflow-x-auto px-4 sm:px-6">
-          {TABS.map(([to, label, icon]) => (
+          {tabs.map(([to, label, icon]) => (
             <NavLink
               key={to}
               to={to}

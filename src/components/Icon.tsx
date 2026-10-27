@@ -14,6 +14,8 @@ const PATHS = {
   activity: 'M3 12h4l3-8 4 16 3-8h4',
   'chevron-right': 'm9 6 6 6-6 6',
   logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4',
+  undo: 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+  lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3M12 15v2',
   leaf: 'M5 21c0-9 5-15 15-16-1 10-7 15-16 15M5 21 14 12',
 } as const
 

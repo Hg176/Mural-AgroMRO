@@ -157,13 +157,13 @@ function FolderAdminActions({ folder }: { folder: Folder }) {
   return (
     <button
       onClick={() => {
-        if (!confirm(`Apagar a pasta ${folder.name} com todas as subpastas, arquivos e comentários?`)) return
+        if (!confirm(`Mover a pasta ${folder.name} para a lixeira, com subpastas, arquivos e comentários? Dá para restaurar por 30 dias.`)) return
         // Sai da pasta antes: ela deixa de existir e esta tela sairia de cena no meio da exclusão.
         navigate(folder.parent_id ? `/arquivos/${folder.parent_id}` : '/arquivos')
         remove.mutateAsync(folder.id).catch((error: Error) => alert(`Não foi possível apagar a pasta: ${error.message}`))
       }}
       className="rounded-lg p-2 text-stone-500 hover:bg-rose-50 hover:text-rose-600"
-      title="Apagar pasta"
+      title="Mover pasta para a lixeira"
     >
       <Icon name="trash" className="size-4" />
     </button>
