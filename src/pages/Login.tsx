@@ -2,6 +2,16 @@ import { useState, type FormEvent } from 'react'
 import { Icon } from '../components/Icon'
 import { supabase } from '../lib/supabase'
 
+// Só "credenciais inválidas" é culpa de quem digitou; o resto é configuração
+// (chave errada, conta não confirmada, sem rede) e precisa aparecer como é.
+function loginErrorMessage(error: { code?: string; message: string; status?: number }) {
+  if (error.code === 'invalid_credentials') return 'E-mail ou senha incorretos.'
+  if (error.code === 'email_not_confirmed') return 'Esta conta ainda não foi confirmada no Supabase (marque "Auto Confirm User" ao criar).'
+  if (error.status === 401 || /api key/i.test(error.message)) return 'Chave do Supabase inválida. Confira a variável SUPABASE_PUBLISHABLE_KEY no GitHub.'
+  if (!error.status) return 'Não foi possível falar com o Supabase. Confira a variável SUPABASE_URL no GitHub e a sua conexão.'
+  return `Não foi possível entrar: ${error.message}`
+}
+
 export function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -13,7 +23,7 @@ export function Login() {
     setLoading(true)
     setError(null)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError('E-mail ou senha incorretos.')
+    if (error) setError(loginErrorMessage(error))
     setLoading(false)
   }
 
