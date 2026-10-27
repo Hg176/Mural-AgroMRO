@@ -1,7 +1,7 @@
 // Todo o acesso a dados do mural. As telas usam só estes hooks; as regras de
 // quem pode o quê ficam no banco (RLS), então aqui não há checagem de papel.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BUCKET, supabase } from './supabase'
+import { BUCKET, key, supabase, url } from './supabase'
 import type { Activity, Comment, Document, Folder, FolderSummary, TrashItem } from './types'
 
 const FOLDER_SUMMARY = '*, documents(count), comments(count), children:folders!parent_id(count)'
@@ -186,19 +186,50 @@ export function useDeleteFolder() {
   })
 }
 
-export function useUploadDocuments() {
-  return useMuralMutation(async (input: { folderId: number; files: File[] }) => {
-    for (const file of input.files) {
-      const path = await uploadFile(input.folderId, file)
-      const { error } = await supabase
-        .from('documents')
-        .insert({ folder_id: input.folderId, name: file.name, path, mime_type: file.type || null, size: file.size })
-      if (error) {
-        await supabase.storage.from(BUCKET).remove([path])
-        throw new Error(error.message)
-      }
-    }
+/** O mesmo limite do bucket (migração inicial); conferido antes para avisar sem gastar o envio. */
+export const MAX_FILE_SIZE = 50 * 1024 * 1024
+
+/**
+ * Envia um arquivo novo para a pasta avisando o progresso (0 a 1). Vai pelo
+ * XHR porque o cliente do Supabase não conta os bytes enviados.
+ */
+export async function uploadDocument(folderId: number, file: File, onProgress: (fraction: number) => void): Promise<void> {
+  const { data } = await supabase.auth.getSession()
+  if (!data.session) throw new Error('Sua sessão expirou. Entre de novo.')
+
+  const safeName = file.name.normalize('NFD').replace(/[^\w.-]+/g, '-')
+  const path = `documentos/${folderId}/${crypto.randomUUID()}-${safeName}`
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${url}/storage/v1/object/${BUCKET}/${path}`)
+    xhr.setRequestHeader('Authorization', `Bearer ${data.session.access_token}`)
+    xhr.setRequestHeader('apikey', key)
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    xhr.upload.onprogress = (event) => event.lengthComputable && onProgress(event.loaded / event.total)
+    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(storageError(xhr))))
+    xhr.onerror = () => reject(new Error('Sem conexão com o servidor. Confira a internet e tente de novo.'))
+    xhr.send(file)
   })
+
+  const { error } = await supabase
+    .from('documents')
+    .insert({ folder_id: folderId, name: file.name, path, mime_type: file.type || null, size: file.size })
+  if (error) {
+    await supabase.storage.from(BUCKET).remove([path])
+    throw new Error(error.message)
+  }
+}
+
+function storageError(xhr: XMLHttpRequest): string {
+  if (xhr.status === 413) return 'Maior que o limite de 50 MB.'
+  try {
+    const body = JSON.parse(xhr.responseText) as { message?: string; statusCode?: string }
+    if (body.statusCode === '413') return 'Maior que o limite de 50 MB.'
+    if (body.statusCode === '403') return 'Sem permissão para enviar arquivos.'
+    return body.message ?? `Erro ${xhr.status}`
+  } catch {
+    return `Erro ${xhr.status}`
+  }
 }
 
 export function useReplaceDocument() {
