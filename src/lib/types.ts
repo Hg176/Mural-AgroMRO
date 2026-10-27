@@ -49,9 +49,11 @@ export interface Comment {
 export type ActivityType =
   | 'folder.created'
   | 'folder.deleted'
+  | 'folder.restored'
   | 'document.uploaded'
   | 'document.replaced'
   | 'document.deleted'
+  | 'document.restored'
   | 'comment.posted'
 
 export interface Activity {
@@ -63,4 +65,18 @@ export interface Activity {
   properties: { name?: string; folder?: string; version?: number; excerpt?: string }
   created_at: string
   user: Pick<Profile, 'id' | 'name'> | null
+}
+
+/** Um item da lixeira: a pasta ou o arquivo que alguém apagou. */
+export interface TrashItem {
+  kind: 'folder' | 'document'
+  id: number
+  name: string
+  /** Pasta onde ficava (nulo para pasta da raiz). */
+  location: string | null
+  size: number | null
+  deleted_at: string
+  deleted_by_name: string | null
+  /** Pastas: quantos arquivos foram junto. */
+  items_inside: number | null
 }

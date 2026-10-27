@@ -33,13 +33,23 @@ navegador (React, GitHub Pages)  ──supabase-js──▶  Supabase
 Como o navegador fala direto com o banco, **as regras ficam no próprio banco**
 (`supabase/migrations/`), não no site:
 
+- **Login em 2 etapas obrigatório**: além da senha, um código do app autenticador
+  (Google Authenticator, Authy...). O banco só entrega dados a sessões que passaram
+  pelo código (`aal2`); só com a senha, a pessoa vê apenas o próprio perfil.
 - **RLS** (Row Level Security): só quem tem linha em `mural.profiles` vê alguma coisa;
   só `admin` cria/edita/apaga pastas e arquivos; cada um comenta em nome próprio.
   Uma conta do Supabase sem perfil no mural (por exemplo, de outro projeto seu) não vê nada.
 - **Feed por triggers**: o banco registra sozinho cada pasta criada, arquivo enviado,
   nova versão e comentário. O site não consegue escrever no feed.
+- **Lixeira de 30 dias**: apagar move para a lixeira (aba *Lixeira*, só para admins),
+  de onde dá para restaurar. Ninguém apaga de vez direto pela API; depois de 30 dias
+  o próprio site faz a faxina quando um admin abre o mural.
 - **Arquivos privados**: o bucket só entrega arquivos por links temporários (1 minuto)
   a quem é membro.
+
+- **CSP no site publicado**: a página só roda o próprio código e só conversa com o
+  Supabase configurado (`vite.config.ts`). Comentários e nomes de arquivo são sempre
+  mostrados como texto, nunca como HTML.
 
 Essas regras têm testes em `supabase/tests/` e rodam no CI a cada PR.
 
@@ -47,9 +57,10 @@ Essas regras têm testes em `supabase/tests/` e rodam no CI a cada PR.
 
 ### 1. Supabase (no projeto que você já tem)
 
-1. **SQL Editor**: cole e rode o conteúdo de
-   `supabase/migrations/20261026120000_mural.sql`. Ele cria o schema `mural`, as tabelas,
-   as regras e o bucket `mural`. Nada é criado fora do schema `mural` além do bucket.
+1. **SQL Editor**: cole e rode, nesta ordem, cada arquivo de `supabase/migrations/`
+   (`20261026120000_mural.sql`, depois `20261027120000_seguranca.sql`). Eles criam o
+   schema `mural`, as tabelas, as regras, a lixeira e o bucket `mural`. Nada é criado
+   fora do schema `mural` além do bucket.
 2. **Project Settings > Data API > Exposed schemas**: adicione `mural`.
 3. **Authentication > Users > Add user > Create new user**: crie a conta de cada pessoa
    (e-mail e senha, marcando *Auto Confirm User*).
@@ -84,6 +95,29 @@ Mande o link e a senha para o Sander e o Zé. Eles não precisam de conta no Git
 > Supabase, mas vai cair na tela "Acesso ainda não liberado": sem linha em
 > `mural.profiles`, o RLS não entrega nada.
 
+### 3. Ajustes de segurança no Supabase
+
+Feitos no painel, uma vez:
+
+- **Authentication > Sign In / Providers**: desligue *Allow new users to sign up*
+  (se o outro projeto que divide este Supabase não precisar de cadastro aberto).
+  Os sócios são criados à mão no passo 1.3.
+- **Authentication > Password** (ou *Providers > Email*): senha mínima de 10 caracteres,
+  com letras e números.
+- **Authentication > Multi-Factor**: confirme que *TOTP (App Authenticator)* está ligado
+  (vem ligado por padrão). No primeiro login cada pessoa lê um QR code com o celular.
+- **Perdeu o celular?** No SQL Editor, apague o cadastro do app da pessoa; no próximo
+  login ela cadastra de novo:
+
+  ```sql
+  delete from auth.mfa_factors
+  where user_id = (select id from auth.users where email = 'email-da-pessoa');
+  ```
+- **Chave secreta** (*secret* / *service_role*): fica só no painel e em servidores seus,
+  nunca no site nem no repositório. Quem a tem ignora o RLS e lê tudo.
+- O ideal é o mural ter um **projeto Supabase só dele**: assim, um problema no outro
+  sistema (ou a chave secreta dele) não alcança os arquivos dos sócios.
+
 ## Desenvolvendo
 
 Precisa de Node 22 e Docker.
@@ -95,6 +129,9 @@ node scripts/dados-demo.mjs # sócios e conteúdo de exemplo (senha "password")
 cp .env.example .env.local
 npm run dev                 # http://localhost:5173
 ```
+
+No primeiro login local o mural pede o QR code do login em 2 etapas: leia com o
+app autenticador do celular (ou use a chave em "Não consegue ler?").
 
 Testes das regras do banco: `npx supabase test db`. Lint e build: `npm run lint && npm run build`.
 

@@ -1,7 +1,7 @@
 -- Regras de acesso e feed do mural. Rode com: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(56);
 
 -- Pessoas: Hugo (admin), Sander (sócio) e alguém de OUTRO projeto do mesmo Supabase.
 insert into auth.users (id, email) values
@@ -12,9 +12,10 @@ insert into mural.profiles (id, name, role) values
     ('00000000-0000-0000-0000-00000000000a', 'Hugo', 'admin'),
     ('00000000-0000-0000-0000-00000000000b', 'Sander', 'socio');
 
-create function pg_temp.act_as(p_id text) returns void language sql as $$
+-- Sessão logada; aal2 = já confirmou o código do app autenticador.
+create function pg_temp.act_as(p_id text, p_aal text default 'aal2') returns void language sql as $$
     select set_config('role', 'authenticated', true),
-           set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated')::text, true);
+           set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated', 'aal', p_aal)::text, true);
 $$;
 create function pg_temp.as_postgres() returns void language sql as $$
     select set_config('role', 'postgres', true);
@@ -50,8 +51,8 @@ select throws_ok($$ insert into mural.documents (folder_id, name, path, size) se
 select throws_ok($$ insert into storage.objects (bucket_id, name) values ('mural', 'docs/sander.pdf') $$, '42501', null, 'sócio não grava no bucket');
 update mural.folders set name = 'Hackeado';
 select is((select count(*)::int from mural.folders where name = 'Hackeado'), 0, 'sócio não renomeia pasta');
-delete from mural.documents;
-select is((select count(*)::int from mural.documents), 2, 'sócio não apaga documento');
+select throws_ok($$ delete from mural.documents $$, '42501', null, 'sócio não apaga documento');
+select throws_ok($$ select mural.trash_document((select min(id) from mural.documents)) $$, '42501', null, 'sócio não manda documento para a lixeira');
 
 select lives_ok($$ insert into mural.comments (folder_id, body) select id, 'Li o estudo, faz sentido.' from mural.folders where name = 'Estudos' $$, 'sócio comenta');
 select throws_ok($$ insert into mural.comments (folder_id, body, user_id) select id, 'em nome do Hugo', '00000000-0000-0000-0000-00000000000a' from mural.folders limit 1 $$, '42501', null, 'sócio não comenta em nome de outro');
@@ -67,12 +68,49 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
 select is((select count(*)::int from mural.folders) + (select count(*)::int from mural.activities) + (select count(*)::int from mural.profiles), 0, 'conta sem perfil no mural não vê nada');
 select is((select count(*)::int from storage.objects where bucket_id = 'mural'), 0, 'conta sem perfil não baixa arquivos');
 
--- Apagar pasta -----------------------------------------------------------------
+-- Login em 2 etapas -----------------------------------------------------------
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b', 'aal1');
+
+select is((select count(*)::int from mural.folders) + (select count(*)::int from mural.documents) + (select count(*)::int from mural.activities), 0, 'só com a senha (sem o código) não vê nada');
+select is((select count(*)::int from storage.objects where bucket_id = 'mural'), 0, 'só com a senha não baixa arquivos');
+select is((select array_agg(name) from mural.profiles), array['Sander'], 'só com a senha vê apenas o próprio perfil');
+select throws_ok($$ insert into mural.comments (folder_id, body) select 1, 'oi' $$, '42501', null, 'só com a senha não comenta');
+
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a', 'aal1');
+select throws_ok($$ insert into mural.folders (name) values ('Sem código') $$, '42501', null, 'admin sem o código não cria pasta');
+
+-- Lixeira ------------------------------------------------------------------------
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
 
-select is((select array_agg(p order by p) from mural.folder_document_paths((select id from mural.folders where name = 'Estudos')) p), array['docs/a-v2.pdf', 'docs/sub.pdf'], 'lista os arquivos da pasta e subpastas para limpar o bucket');
-delete from mural.folders where name = 'Estudos';
-select is((select array_agg(type order by id) from mural.activities where type like '%.deleted'), array['folder.deleted'], 'apagar pasta gera uma notícia só (sem uma por subpasta ou arquivo)');
+select throws_ok($$ delete from mural.folders $$, '42501', null, 'nem o admin apaga de vez direto');
+select lives_ok($$ select mural.trash_document((select id from mural.documents where name = 'teste.pdf')) $$, 'admin manda arquivo para a lixeira');
+select lives_ok($$ select mural.trash_folder((select id from mural.folders where name = 'Estudos')) $$, 'admin manda pasta para a lixeira');
+select is((select array_agg(type order by id) from mural.activities where type like '%.deleted'), array['document.deleted', 'folder.deleted'], 'apagar pasta gera uma notícia só (sem uma por subpasta ou arquivo)');
+select is((select count(*)::int from mural.folders) + (select count(*)::int from mural.documents) + (select count(*)::int from mural.comments), 0, 'pasta, subpasta, arquivos e comentários somem do mural');
+select is((select array_agg(kind || ':' || name order by kind) from mural.trash_items()), array['document:teste.pdf', 'folder:Estudos'], 'lixeira mostra a pasta e o arquivo apagado antes dela, não cada item de dentro');
+select is((select items_inside::int from mural.trash_items() where kind = 'folder'), 1, 'lixeira conta os arquivos que foram junto com a pasta');
+select throws_ok($$ select mural.restore_document((select id from mural.trash_items() where kind = 'document')) $$, 'P0001', null, 'arquivo de pasta na lixeira só volta depois da pasta');
+
+select lives_ok($$ select mural.restore_folder((select id from mural.trash_items() where kind = 'folder')) $$, 'admin restaura a pasta');
+select is((select array_agg(name order by name) from mural.folders), array['Estudos', 'Multi-tenancy'], 'pasta volta com a subpasta');
+select is((select array_agg(name) from mural.documents), array['semana-44-final.pdf'], 'volta só o que foi apagado junto; o arquivo apagado antes continua na lixeira');
+select is((select count(*)::int from mural.comments), 1, 'comentários voltam junto');
+select is((select count(*)::int from mural.activities where type = 'folder.restored'), 1, 'restaurar entra no feed');
+
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select throws_ok($$ select * from mural.trash_items() $$, '42501', null, 'sócio não vê a lixeira');
+select throws_ok($$ select * from mural.purge_trash() $$, '42501', null, 'sócio não esvazia a lixeira');
+
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select is((select array_agg(p) from mural.purge_trash() p), null, 'nada expira antes de 30 dias');
+select pg_temp.as_postgres();
+update mural.documents set deleted_at = now() - interval '31 days' where deleted_at is not null;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select is((select array_agg(p) from mural.purge_trash() p), array['docs/sub.pdf'], 'depois de 30 dias apaga de vez e devolve o arquivo para limpar o bucket');
+select lives_ok($$ select mural.trash_folder((select id from mural.folders where name = 'Estudos')) $$, 'apaga a pasta de novo');
+select is((select array_agg(p) from mural.purge_trash('folder', (select id from mural.trash_items() where kind = 'folder')) p), array['docs/a-v2.pdf'], 'apagar para sempre na hora devolve os arquivos da pasta');
+select pg_temp.as_postgres();
+select is((select count(*)::int from mural.folders), 0, 'a pasta e a subpasta saíram do banco');
 
 select * from finish();
 rollback;

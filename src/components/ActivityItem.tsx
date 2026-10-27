@@ -8,9 +8,11 @@ import { RelativeTime } from './RelativeTime'
 const TYPES: Record<ActivityType, { text: string; icon: IconName; color: string }> = {
   'folder.created': { text: 'criou a pasta', icon: 'folder', color: 'bg-amber-100 text-amber-700' },
   'folder.deleted': { text: 'apagou a pasta', icon: 'folder', color: 'bg-amber-100 text-amber-700' },
+  'folder.restored': { text: 'restaurou da lixeira a pasta', icon: 'folder', color: 'bg-amber-100 text-amber-700' },
   'document.uploaded': { text: 'enviou o arquivo', icon: 'file', color: 'bg-sky-100 text-sky-700' },
   'document.replaced': { text: 'enviou uma nova versão de', icon: 'file', color: 'bg-sky-100 text-sky-700' },
   'document.deleted': { text: 'apagou o arquivo', icon: 'file', color: 'bg-sky-100 text-sky-700' },
+  'document.restored': { text: 'restaurou da lixeira o arquivo', icon: 'file', color: 'bg-sky-100 text-sky-700' },
   'comment.posted': { text: 'comentou em', icon: 'comment', color: 'bg-violet-100 text-violet-700' },
 }
 
