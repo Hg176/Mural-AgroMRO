@@ -1,7 +1,7 @@
 -- Regras de acesso e feed do mural. Rode com: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(56);
+select plan(51);
 
 -- Pessoas: Hugo (admin), Sander (sócio) e alguém de OUTRO projeto do mesmo Supabase.
 insert into auth.users (id, email) values
@@ -12,10 +12,10 @@ insert into mural.profiles (id, name, role) values
     ('00000000-0000-0000-0000-00000000000a', 'Hugo', 'admin'),
     ('00000000-0000-0000-0000-00000000000b', 'Sander', 'socio');
 
--- Sessão logada; aal2 = já confirmou o código do app autenticador.
-create function pg_temp.act_as(p_id text, p_aal text default 'aal2') returns void language sql as $$
+-- Sessão de quem entrou pelo link do e-mail (aal1).
+create function pg_temp.act_as(p_id text) returns void language sql as $$
     select set_config('role', 'authenticated', true),
-           set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated', 'aal', p_aal)::text, true);
+           set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated', 'aal', 'aal1')::text, true);
 $$;
 create function pg_temp.as_postgres() returns void language sql as $$
     select set_config('role', 'postgres', true);
@@ -67,17 +67,6 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
 
 select is((select count(*)::int from mural.folders) + (select count(*)::int from mural.activities) + (select count(*)::int from mural.profiles), 0, 'conta sem perfil no mural não vê nada');
 select is((select count(*)::int from storage.objects where bucket_id = 'mural'), 0, 'conta sem perfil não baixa arquivos');
-
--- Login em 2 etapas -----------------------------------------------------------
-select pg_temp.act_as('00000000-0000-0000-0000-00000000000b', 'aal1');
-
-select is((select count(*)::int from mural.folders) + (select count(*)::int from mural.documents) + (select count(*)::int from mural.activities), 0, 'só com a senha (sem o código) não vê nada');
-select is((select count(*)::int from storage.objects where bucket_id = 'mural'), 0, 'só com a senha não baixa arquivos');
-select is((select array_agg(name) from mural.profiles), array['Sander'], 'só com a senha vê apenas o próprio perfil');
-select throws_ok($$ insert into mural.comments (folder_id, body) select 1, 'oi' $$, '42501', null, 'só com a senha não comenta');
-
-select pg_temp.act_as('00000000-0000-0000-0000-00000000000a', 'aal1');
-select throws_ok($$ insert into mural.folders (name) values ('Sem código') $$, '42501', null, 'admin sem o código não cria pasta');
 
 -- Lixeira ------------------------------------------------------------------------
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');

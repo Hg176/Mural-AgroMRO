@@ -25,7 +25,7 @@ Roda **sem servidor próprio**: o site é estático (GitHub Pages) e fala direto
 
 ```
 navegador (React, GitHub Pages)  ──supabase-js──▶  Supabase
-                                                    ├─ Auth: login por e-mail e senha
+                                                    ├─ Auth: login por link no e-mail
                                                     ├─ Postgres, schema "mural": tabelas + RLS + triggers do feed
                                                     └─ Storage, bucket privado "mural": os arquivos
 ```
@@ -33,9 +33,9 @@ navegador (React, GitHub Pages)  ──supabase-js──▶  Supabase
 Como o navegador fala direto com o banco, **as regras ficam no próprio banco**
 (`supabase/migrations/`), não no site:
 
-- **Login em 2 etapas obrigatório**: além da senha, um código do app autenticador
-  (Google Authenticator, Authy...). O banco só entrega dados a sessões que passaram
-  pelo código (`aal2`); só com a senha, a pessoa vê apenas o próprio perfil.
+- **Login por link no e-mail**: sem senha. A pessoa digita o e-mail e clica no link que
+  chega; só contas criadas à mão recebem link (o site não cria contas). A mensagem é a
+  mesma para e-mail com ou sem acesso, para não revelar quem está no mural.
 - **RLS** (Row Level Security): só quem tem linha em `mural.profiles` vê alguma coisa;
   só `admin` cria/edita/apaga pastas e arquivos; cada um comenta em nome próprio.
   Uma conta do Supabase sem perfil no mural (por exemplo, de outro projeto seu) não vê nada.
@@ -58,12 +58,13 @@ Essas regras têm testes em `supabase/tests/` e rodam no CI a cada PR.
 ### 1. Supabase (no projeto que você já tem)
 
 1. **SQL Editor**: cole e rode, nesta ordem, cada arquivo de `supabase/migrations/`
-   (`20261026120000_mural.sql`, depois `20261027120000_seguranca.sql`). Eles criam o
+   (`20261026120000_mural.sql`, `20261027120000_seguranca.sql` e
+   `20261027150000_login_por_email.sql`). Eles criam o
    schema `mural`, as tabelas, as regras, a lixeira e o bucket `mural`. Nada é criado
    fora do schema `mural` além do bucket.
 2. **Project Settings > Data API > Exposed schemas**: adicione `mural`.
 3. **Authentication > Users > Add user > Create new user**: crie a conta de cada pessoa
-   (e-mail e senha, marcando *Auto Confirm User*).
+   (e-mail, marcando *Auto Confirm User*; a senha pode ser qualquer uma longa, ninguém usa).
 4. **SQL Editor**: libere cada pessoa no mural:
 
    ```sql
@@ -89,30 +90,36 @@ Essas regras têm testes em `supabase/tests/` e rodam no CI a cada PR.
 3. Rode o workflow **Publicar no GitHub Pages** (aba Actions) ou faça um merge na `main`.
    O site fica em `https://hg176.github.io/Mural-AgroMRO/`.
 
-Mande o link e a senha para o Sander e o Zé. Eles não precisam de conta no GitHub.
+Mande o link para o Sander e o Zé. Eles entram com o próprio e-mail e não precisam de conta no GitHub.
 
 > Se o seu outro projeto permite cadastro aberto, alguém pode criar conta no seu
 > Supabase, mas vai cair na tela "Acesso ainda não liberado": sem linha em
 > `mural.profiles`, o RLS não entrega nada.
 
-### 3. Ajustes de segurança no Supabase
+### 3. Login por e-mail (obrigatório)
+
+- **Authentication > URL Configuration > Redirect URLs**: adicione
+  `https://hg176.github.io/Mural-AgroMRO/**`. Sem isso, o link do e-mail leva para a
+  *Site URL* do projeto (que pode ser o seu outro sistema).
+- **Authentication > SMTP Settings**: o e-mail padrão do Supabase só envia para quem é
+  da equipe do projeto no painel e no máximo 2 por hora. Para o Sander e o Zé receberem
+  o link, configure um SMTP próprio (por exemplo, Resend no plano grátis ou uma senha de
+  app do Gmail). Se o outro projeto já tem SMTP configurado, não precisa fazer nada.
+- Opcional: **Authentication > Emails > Magic Link** para trocar o texto do e-mail. Esse
+  modelo vale para o projeto inteiro, inclusive o outro sistema.
+
+### 4. Ajustes de segurança no Supabase
 
 Feitos no painel, uma vez:
 
 - **Authentication > Sign In / Providers**: desligue *Allow new users to sign up*
   (se o outro projeto que divide este Supabase não precisar de cadastro aberto).
   Os sócios são criados à mão no passo 1.3.
-- **Authentication > Password** (ou *Providers > Email*): senha mínima de 10 caracteres,
-  com letras e números.
-- **Authentication > Multi-Factor**: confirme que *TOTP (App Authenticator)* está ligado
-  (vem ligado por padrão). No primeiro login cada pessoa lê um QR code com o celular.
-- **Perdeu o celular?** No SQL Editor, apague o cadastro do app da pessoa; no próximo
-  login ela cadastra de novo:
-
-  ```sql
-  delete from auth.mfa_factors
-  where user_id = (select id from auth.users where email = 'email-da-pessoa');
-  ```
+- **O e-mail é a chave do mural**: quem entra no e-mail de um sócio entra no mural.
+  Vale ligar a verificação em 2 etapas no próprio e-mail (Gmail, Outlook).
+- Contas antigas ainda têm senha (o Supabase aceita senha pela API). Se quiser fechar
+  essa porta, troque a senha de cada uma por uma bem longa e aleatória em
+  **Authentication > Users**.
 - **Chave secreta** (*secret* / *service_role*): fica só no painel e em servidores seus,
   nunca no site nem no repositório. Quem a tem ignora o RLS e lê tudo.
 - O ideal é o mural ter um **projeto Supabase só dele**: assim, um problema no outro
@@ -125,13 +132,13 @@ Precisa de Node 22 e Docker.
 ```bash
 npm install
 npx supabase start          # Supabase local, já com a migração aplicada
-node scripts/dados-demo.mjs # sócios e conteúdo de exemplo (senha "password")
+node scripts/dados-demo.mjs # sócios e conteúdo de exemplo
 cp .env.example .env.local
 npm run dev                 # http://localhost:5173
 ```
 
-No primeiro login local o mural pede o QR code do login em 2 etapas: leia com o
-app autenticador do celular (ou use a chave em "Não consegue ler?").
+Para entrar, peça o link com `hugo@mural.test`, `sander@mural.test` ou `ze@mural.test`
+e abra o e-mail no Mailpit local: http://127.0.0.1:54324.
 
 Testes das regras do banco: `npx supabase test db`. Lint e build: `npm run lint && npm run build`.
 
