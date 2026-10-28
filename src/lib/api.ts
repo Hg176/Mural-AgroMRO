@@ -140,6 +140,13 @@ export async function fileUrl(document: Document, download: boolean): Promise<st
   return data.signedUrl
 }
 
+/** Conteúdo de um arquivo de texto (usado para mostrar páginas HTML no visualizador). */
+export async function fileText(document: Document): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(document.path)
+  if (error) throw new Error(error.message)
+  return data.text()
+}
+
 async function uploadFile(folderId: number, file: File): Promise<string> {
   const safeName = file.name.normalize('NFD').replace(/[^\w.-]+/g, '-')
   const path = `documentos/${folderId}/${crypto.randomUUID()}-${safeName}`

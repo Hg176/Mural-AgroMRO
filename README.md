@@ -10,7 +10,7 @@ Roda **sem servidor próprio**: o site é estático (GitHub Pages) e fala direto
 ## O que tem
 
 - **Gerenciador de arquivos**: pastas e subpastas, envio de vários arquivos, nova versão
-  (v2, v3...), abrir no navegador (PDF, imagem, texto) e baixar.
+  (v2, v3...), abrir no navegador (PDF, imagem, texto, página HTML) e baixar.
 - **Uma conversa por tema**: cada pasta tem a sua seção de comentários.
 - **Novidades**: linha do tempo de tudo o que muda. O que a pessoa ainda não viu aparece
   como **novo**, com contador na aba.
@@ -51,6 +51,11 @@ Como o navegador fala direto com o banco, **as regras ficam no próprio banco**
 - **CSP no site publicado**: a página só roda o próprio código e só conversa com o
   Supabase configurado (`vite.config.ts`). Comentários e nomes de arquivo são sempre
   mostrados como texto, nunca como HTML.
+- **Páginas HTML isoladas**: um `.html` enviado abre dentro do mural num iframe com
+  `sandbox="allow-scripts"` (sem `allow-same-origin`), pelo `public/visualizar.html`.
+  A página roda os próprios scripts, estilos e fontes, mas numa origem isolada: não lê
+  a sessão nem os dados do mural, não muda a aba do portal e não envia nada para
+  servidor nenhum (`connect-src 'none'`, `form-action 'none'`).
 
 Essas regras têm testes em `supabase/tests/` e rodam no CI a cada PR.
 
