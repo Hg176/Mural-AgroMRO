@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<!--
+  Visualizador de páginas HTML enviadas para o mural. O portal abre esta
+  página num iframe com sandbox="allow-scripts" (sem allow-same-origin), então
+  ela roda numa origem isolada: não enxerga a sessão, os cookies nem o
+  localStorage do mural, e não consegue mudar a aba do portal. A política
+  abaixo deixa a página enviada ter seus próprios estilos, scripts, fontes e
+  imagens, mas sem conversar com servidor nenhum nem enviar formulários.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https:; style-src 'unsafe-inline' https:; img-src https: data: blob:; font-src https: data:; media-src https: data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'">
+<title>Visualizador</title>
+</head>
+<body>
+<script>
+  addEventListener('message', function receber(event) {
+    if (event.source !== parent || typeof event.data?.html !== 'string') return
+    removeEventListener('message', receber)
+    document.open()
+    document.write(event.data.html)
+    document.close()
+  })
+  parent.postMessage('visualizador-pronto', '*')
+</script>
+</body>
+</html>

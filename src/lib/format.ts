@@ -53,9 +53,15 @@ export function extension(name: string): string {
   return ext ? ext.toUpperCase().slice(0, 4) : 'ARQ'
 }
 
-/** O navegador consegue mostrar sem baixar (PDF, imagem, texto). */
-export function isPreviewable(mime: string | null): boolean {
-  return !!mime && (mime.startsWith('image/') || mime.startsWith('text/') || mime === 'application/pdf')
+/** Página HTML: abre no visualizador isolado, não direto do Storage (que entrega como texto puro). */
+export function isHtml(document: { name: string; mime_type: string | null }): boolean {
+  return document.mime_type === 'text/html' || /\.html?$/i.test(document.name)
+}
+
+/** O navegador consegue mostrar sem baixar (PDF, imagem, texto, página HTML). */
+export function isPreviewable(document: { name: string; mime_type: string | null }): boolean {
+  const mime = document.mime_type
+  return isHtml(document) || (!!mime && (mime.startsWith('image/') || mime.startsWith('text/') || mime === 'application/pdf'))
 }
 
 export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {

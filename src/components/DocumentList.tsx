@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fileUrl, useDeleteDocument, useDocuments, useReplaceDocument } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { extension, fileSize, isPreviewable, plural } from '../lib/format'
+import { extension, fileSize, isHtml, isPreviewable, plural } from '../lib/format'
 import type { Document } from '../lib/types'
+import { HtmlViewer } from './HtmlViewer'
 import { Icon } from './Icon'
 import { RelativeTime } from './RelativeTime'
 import { DocumentRowsSkeleton, Skeleton } from './Skeleton'
@@ -20,6 +21,7 @@ export function DocumentList({ folderId, highlight, canDrop = false }: { folderI
   const { data: documents = [], isLoading } = useDocuments(folderId)
   const replace = useReplaceDocument()
   const remove = useDeleteDocument()
+  const [viewing, setViewing] = useState<Document | null>(null)
 
   useEffect(() => {
     if (highlight && documents.length) document.getElementById(`documento-${highlight}`)?.scrollIntoView({ block: 'center' })
@@ -57,8 +59,8 @@ export function DocumentList({ folderId, highlight, canDrop = false }: { folderI
               </p>
             </div>
             <div className="flex items-center gap-1">
-              {isPreviewable(doc.mime_type) && (
-                <button onClick={() => open(doc, false)} className={ICON_BUTTON} title="Abrir"><Icon name="eye" className="size-4" /></button>
+              {isPreviewable(doc) && (
+                <button onClick={() => (isHtml(doc) ? setViewing(doc) : open(doc, false))} className={ICON_BUTTON} title="Abrir"><Icon name="eye" className="size-4" /></button>
               )}
               <button onClick={() => open(doc, true)} className={ICON_BUTTON} title="Baixar"><Icon name="download" className="size-4" /></button>
               {isAdmin && (
@@ -80,6 +82,7 @@ export function DocumentList({ folderId, highlight, canDrop = false }: { folderI
           </li>
         ))}
       </ul>
+      {viewing && <HtmlViewer document={viewing} onClose={() => setViewing(null)} onDownload={() => open(viewing, true)} />}
     </div>
   )
 }
